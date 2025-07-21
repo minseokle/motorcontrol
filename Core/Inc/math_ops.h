@@ -8,6 +8,8 @@
 #define TWO_PI_F 	6.28318548203f
 #define PI_OVER_2_F	1.57079632679f
 #define LUT_MULT	81.4873308631f
+#define PI_OVER_3_F 1.0471975512f // 60 degrees in radians
+#define PI_OVER_6_F 0.5235987755f // 30 degrees in radians
 
 #include "math.h"
 

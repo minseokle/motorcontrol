@@ -11,7 +11,7 @@
 #include "hw_config.h"
 #include "user_config.h"
 
-void ps_warmup(EncoderStruct * encoder, int n){
+void ps_warmup(AbsEncoderStruct * encoder, int n){
 	/* Hall position sensors noisy on startup.  Take a bunch of samples to clear this data */
 	for(int i = 0; i<n; i++){
 		encoder->spi_tx_word = 0x0000;
@@ -22,8 +22,8 @@ void ps_warmup(EncoderStruct * encoder, int n){
 	}
 }
 
-void ps_sample(EncoderStruct * encoder, float dt){
-	/* updates EncoderStruct encoder with the latest sample
+void ps_sample(AbsEncoderStruct * encoder, float dt){
+	/* updates AbsEncoderStruct encoder with the latest sample
 	 * after elapsed time dt */
 
 	/* Shift around previous samples */
@@ -96,12 +96,3 @@ void ps_sample(EncoderStruct * encoder, float dt){
 
 }
 
-void ps_print(EncoderStruct * encoder, int dt_ms){
-	printf("Raw: %d", encoder->raw);
-	printf("   Linearized Count: %d", encoder->count);
-	printf("   Single Turn: %f", encoder->angle_singleturn);
-	printf("   Multiturn: %f", encoder->angle_multiturn[0]);
-	printf("   Electrical: %f", encoder->elec_angle);
-	printf("   Turns:  %d\r\n", encoder->turns);
-	//HAL_Delay(dt_ms);
-}

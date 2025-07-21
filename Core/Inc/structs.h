@@ -16,7 +16,9 @@
 #include "gpio.h"
 #include "adc.h"
 #include "tim.h"
+#include "encoder_struct.h"
 #include "position_sensor.h"
+#include "hall_sensor.h"
 #include "preference_writer.h"
 #include "fsm.h"
 #include "drv8323.h"
@@ -36,7 +38,9 @@ extern ControllerStruct controller;
 extern ObserverStruct observer;
 extern COMStruct com;
 extern FSMStruct state;
-extern EncoderStruct comm_encoder;
+extern BasicEncoderStruct basic_encoder;
+extern AbsEncoderStruct abs_encoder;
+extern HallSensorStruct hall_sensor;
 extern DRVStruct drv;
 extern PreferenceWriter prefs;
 extern CalStruct comm_encoder_cal;

@@ -32,11 +32,11 @@ typedef struct{
 	int m_zero, e_zero;
 	int offset_lut[N_LUT];
 	uint8_t first_sample;
-} EncoderStruct;
+} AbsEncoderStruct;
 
 
-void ps_warmup(EncoderStruct * encoder, int n);
-void ps_sample(EncoderStruct * encoder, float dt);
-void ps_print(EncoderStruct * encoder, int dt_ms);
+void ps_warmup(AbsEncoderStruct * encoder, int n);
+void ps_sample(AbsEncoderStruct * encoder, float dt);
+// void ps_print(AbsEncoderStruct * encoder, int dt_ms);
 
 #endif /* INC_POSITION_SENSOR_H_ */

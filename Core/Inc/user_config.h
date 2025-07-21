@@ -14,7 +14,7 @@ extern "C" {
 #define THETA_MAX               __float_reg[5]                                  // Maximum position setpoint
 #define I_FW_MAX                __float_reg[6]                                  // Maximum field weakening current
 #define R_NOMINAL               __float_reg[7]                                  // Nominal motor resistance, set during calibration
-#define TEMP_MAX                __float_reg[8]                                  // Temperature safety lmit
+#define TEMP_MAX                __float_reg[8]                                  // Temperature safety limit
 #define I_MAX_CONT              __float_reg[9]                                  // Continuous max current
 #define PPAIRS					__float_reg[10]									// Number of motor pole-pairs
 //#define L_D						__float_reg[11]									// D-axis inductance
@@ -26,7 +26,7 @@ extern "C" {
 #define GR						__float_reg[17]									// Gear ratio
 #define I_CAL					__float_reg[18]									// Calibration Current
 #define P_MIN					__float_reg[19]									// Position setpoint lower limit (rad)
-#define P_MAX					__float_reg[20]									// Position setupoint upper bound (rad)
+#define P_MAX					__float_reg[20]									// Position setpoint upper bound (rad)
 #define V_MIN					__float_reg[21]									// Velocity setpoint lower bound (rad/s)
 #define V_MAX					__float_reg[22]									// Velocity setpoint upper bound (rad/s)
 #define KP_MAX					__float_reg[23]									// Max position gain (N-m/rad)
@@ -39,7 +39,9 @@ extern "C" {
 #define CAN_TIMEOUT             __int_reg[3]                                    // CAN bus timeout period
 #define M_ZERO					__int_reg[4]
 #define E_ZERO					__int_reg[5]
-#define ENCODER_LUT             __int_reg[6]                                    // Encoder offset LUT - 128 elements long
+#define ENCODER_LUT             __int_reg[6]
+#define ENCODER_LUT_SIZE        128
+#define ENCODER_TYPE            __int_reg[134]//6+ENCODER_LUT_SIZE                Type of encoder used (0: absolute, 1: hall)
 
 
 

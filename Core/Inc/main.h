@@ -64,6 +64,12 @@ void Error_Handler(void);
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
+#define HALL_W_Pin GPIO_PIN_6
+#define HALL_W_GPIO_Port GPIOC
+#define HALL_V_Pin GPIO_PIN_7
+#define HALL_V_GPIO_Port GPIOC
+#define HALL_U_Pin GPIO_PIN_8
+#define HALL_U_GPIO_Port GPIOC
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
@@ -72,7 +78,8 @@ void Error_Handler(void);
 #define SWO_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
-
+#define FLOAT_REG_SIZE 64
+#define INT_REG_SIZE 256
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -1,22 +1,21 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under BSD 3-Clause license,
-  * the "License"; You may not use this file except in compliance with the
-  * License. You may obtain a copy of the License at:
-  *                        opensource.org/licenses/BSD-3-Clause
-  *
-  ******************************************************************************
-  */
-
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
+ * All rights reserved.</center></h2>
+ *
+ * This software component is licensed by ST under BSD 3-Clause license,
+ * the "License"; You may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at:
+ *                        opensource.org/licenses/BSD-3-Clause
+ *
+ ******************************************************************************
+ */
 
 /// high-bandwidth 3-phase motor control for robots
 /// Written by Ben Katz, with much inspiration from Bayley Wang, Nick Kirkby, Shane Colton, David Otten, and others
@@ -40,6 +39,8 @@
 
 #include "stm32f4xx_flash.h"
 #include "flash_writer.h"
+#include "encoder_struct.h"
+#include "hall_sensor.h"
 #include "position_sensor.h"
 #include "preference_writer.h"
 #include "hw_config.h"
@@ -63,8 +64,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 
-#define VERSION_NUM 2.0f
-
+#define VERSION_NUM 3.0f
 
 /* USER CODE END PM */
 
@@ -73,8 +73,8 @@
 /* USER CODE BEGIN PV */
 
 /* Flash Registers */
-float __float_reg[64];
-int __int_reg[256];
+float __float_reg[FLOAT_REG_SIZE];
+int __int_reg[INT_REG_SIZE];
 PreferenceWriter prefs;
 
 int count = 0;
@@ -85,7 +85,11 @@ ControllerStruct controller;
 ObserverStruct observer;
 COMStruct com;
 FSMStruct state;
-EncoderStruct comm_encoder;
+
+BasicEncoderStruct basic_encoder;
+AbsEncoderStruct abs_encoder;
+HallSensorStruct hall_sensor;
+
 DRVStruct drv;
 CalStruct comm_encoder_cal;
 CANTxMessage can_tx;
@@ -108,15 +112,12 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-
-
-
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
+ * @brief  The application entry point.
+ * @retval int
+ */
 int main(void)
 {
 
@@ -150,60 +151,142 @@ int main(void)
   MX_ADC1_Init();
   MX_ADC2_Init();
   MX_ADC3_Init();
+  MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
+  HAL_GPIO_WritePin(LED, GPIO_PIN_SET);
 
   /* Load settings from flash */
   preference_writer_init(&prefs, 6);
   preference_writer_load(prefs);
 
   /* Sanitize configs in case flash is empty*/
-  if(E_ZERO==-1){E_ZERO = 0;}
-  if(M_ZERO==-1){M_ZERO = 0;}
-  if(isnan(I_BW) || I_BW==-1){I_BW = 1000;}
-  if(isnan(I_MAX) || I_MAX ==-1){I_MAX=40;}
-  if(isnan(I_FW_MAX) || I_FW_MAX ==-1){I_FW_MAX=0;}
-  if(CAN_ID==-1){CAN_ID = 1;}
-  if(CAN_MASTER==-1){CAN_MASTER = 0;}
-  if(CAN_TIMEOUT==-1){CAN_TIMEOUT = 1000;}
-  if(isnan(R_NOMINAL) || R_NOMINAL==-1){R_NOMINAL = 0.0f;}
-  if(isnan(TEMP_MAX) || TEMP_MAX==-1){TEMP_MAX = 125.0f;}
-  if(isnan(I_MAX_CONT) || I_MAX_CONT==-1){I_MAX_CONT = 14.0f;}
-  if(isnan(I_CAL)||I_CAL==-1){I_CAL = 5.0f;}
-  if(isnan(PPAIRS) || PPAIRS==-1){PPAIRS = 21.0f;}
-  if(isnan(GR) || GR==-1){GR = 1.0f;}
-  if(isnan(KT) || KT==-1){KT = 1.0f;}
-  if(isnan(KP_MAX) || KP_MAX==-1){KP_MAX = 500.0f;}
-  if(isnan(KD_MAX) || KD_MAX==-1){KD_MAX = 5.0f;}
-  if(isnan(P_MAX)){P_MAX = 12.5f;}
-  if(isnan(P_MIN)){P_MIN = -12.5f;}
-  if(isnan(V_MAX)){V_MAX = 65.0f;}
-  if(isnan(V_MIN)){V_MIN = -65.0f;}
+  if (E_ZERO == -1)
+  {
+    E_ZERO = 0;
+  }
+  if (M_ZERO == -1)
+  {
+    M_ZERO = 0;
+  }
+  if (isnan(I_BW) || I_BW == -1)
+  {
+    I_BW = 1000;
+  }
+  if (isnan(I_MAX) || I_MAX == -1)
+  {
+    I_MAX = 40;
+  }
+  if (isnan(I_FW_MAX) || I_FW_MAX == -1)
+  {
+    I_FW_MAX = 0;
+  }
+  if (CAN_ID == -1)
+  {
+    CAN_ID = 1;
+  }
+  if (CAN_MASTER == -1)
+  {
+    CAN_MASTER = 0;
+  }
+  if (CAN_TIMEOUT == -1)
+  {
+    CAN_TIMEOUT = 1000;
+  }
+  if (isnan(R_NOMINAL) || R_NOMINAL == -1)
+  {
+    R_NOMINAL = 0.0f;
+  }
+  if (isnan(TEMP_MAX) || TEMP_MAX == -1)
+  {
+    TEMP_MAX = 125.0f;
+  }
+  if (isnan(I_MAX_CONT) || I_MAX_CONT == -1)
+  {
+    I_MAX_CONT = 14.0f;
+  }
+  if (isnan(I_CAL) || I_CAL == -1)
+  {
+    I_CAL = 5.0f;
+  }
+  if (isnan(PPAIRS) || PPAIRS == -1)
+  {
+    PPAIRS = 21.0f;
+  }
+  if (isnan(GR) || GR == -1)
+  {
+    GR = 1.0f;
+  }
+  if (isnan(KT) || KT == -1)
+  {
+    KT = 1.0f;
+  }
+  if (isnan(KP_MAX) || KP_MAX == -1)
+  {
+    KP_MAX = 500.0f;
+  }
+  if (isnan(KD_MAX) || KD_MAX == -1)
+  {
+    KD_MAX = 5.0f;
+  }
+  if (isnan(P_MAX))
+  {
+    P_MAX = 12.5f;
+  }
+  if (isnan(P_MIN))
+  {
+    P_MIN = -12.5f;
+  }
+  if (isnan(V_MAX))
+  {
+    V_MAX = 65.0f;
+  }
+  if (isnan(V_MIN))
+  {
+    V_MIN = -65.0f;
+  }
+  if (ENCODER_TYPE == -1)
+  {
+    ENCODER_TYPE = 1;
+  }
 
   printf("\r\nFirmware Version Number: %.2f\r\n", VERSION_NUM);
 
   /* Controller Setup */
-  if(PHASE_ORDER){							// Timer channel to phase mapping
-
+  if (PHASE_ORDER)
+  { // Timer channel to phase mapping
   }
-  else{
-
+  else
+  {
   }
 
   init_controller_params(&controller);
 
   /* calibration "encoder" zeroing */
-  memset(&comm_encoder_cal.cal_position, 0, sizeof(EncoderStruct));
+  memset(&comm_encoder_cal.cal_position, 0, sizeof(BasicEncoderStruct));
 
-  /* commutation encoder setup */
-  comm_encoder.m_zero = M_ZERO;
-  comm_encoder.e_zero = E_ZERO;
-  comm_encoder.ppairs = PPAIRS;
+  if (ENCODER_TYPE == ENCODER_ABS)
+  {
+    /* commutation encoder setup */
+    abs_encoder.m_zero = M_ZERO;
+    abs_encoder.e_zero = E_ZERO;
+    abs_encoder.ppairs = PPAIRS;
 
-  if(EN_ENC_LINEARIZATION){memcpy(&comm_encoder.offset_lut, &ENCODER_LUT, sizeof(comm_encoder.offset_lut));}	// Copy the linearization lookup table
-  else{memset(&comm_encoder.offset_lut, 0, sizeof(comm_encoder.offset_lut));}
-  ps_warmup(&comm_encoder, 100);			// clear the noisy data when the encoder first turns on
-
-  //for(int i = 0; i<128; i++){printf("%d\r\n", comm_encoder.offset_lut[i]);}
+    if (EN_ENC_LINEARIZATION)
+    {
+      memcpy(&abs_encoder.offset_lut, &ENCODER_LUT, sizeof(abs_encoder.offset_lut));
+    } // Copy the linearization lookup table
+    else
+    {
+      memset(&abs_encoder.offset_lut, 0, sizeof(abs_encoder.offset_lut));
+    }
+    ps_warmup(&abs_encoder, 100); // clear the noisy data when the encoder first turns on
+  }
+  else if (ENCODER_TYPE == ENCODER_HALL)
+  {
+    hall_sensor_init(&hall_sensor, hall_sensor_get_state_from_gpio(), 7);
+    HAL_TIM_IC_Start_IT(&htim8, TIM_CHANNEL_1); // Start the Hall sensor timer
+  }
+  // for(int i = 0; i<128; i++){printf("%d\r\n", comm_encoder.offset_lut[i]);}
 
   /* Turn on ADCs */
   HAL_ADC_Start(&hadc1);
@@ -211,16 +294,22 @@ int main(void)
   HAL_ADC_Start(&hadc3);
 
   /* DRV8323 setup */
-  HAL_GPIO_WritePin(DRV_CS, GPIO_PIN_SET ); 	// CS high
-  HAL_GPIO_WritePin(ENABLE_PIN, GPIO_PIN_SET );
+  HAL_GPIO_WritePin(DRV_CS, GPIO_PIN_SET); // CS high
+  HAL_GPIO_WritePin(ENABLE_PIN, GPIO_PIN_SET);
   HAL_Delay(1);
-  //drv_calibrate(drv);
+  // drv_calibrate(drv);
   HAL_Delay(1);
   drv_write_DCR(drv, 0x0, DIS_GDF_EN, 0x0, PWM_MODE_3X, 0x0, 0x0, 0x0, 0x0, 0x1);
   HAL_Delay(1);
   int CSA_GAIN;
-  if(I_MAX <= 40.0f){CSA_GAIN = CSA_GAIN_40;}	// Up to 40A use 40X amplifier gain
-  else{CSA_GAIN = CSA_GAIN_20;}					// From 40-60A use 20X amplifier gain.  (Make this generic in the future)
+  if (I_MAX <= 40.0f)
+  {
+    CSA_GAIN = CSA_GAIN_40;
+  } // Up to 40A use 40X amplifier gain
+  else
+  {
+    CSA_GAIN = CSA_GAIN_20;
+  } // From 40-60A use 20X amplifier gain.  (Make this generic in the future)
   drv_write_CSACR(drv, 0x0, 0x1, 0x0, CSA_GAIN_40, 0x0, 0x1, 0x1, 0x1, SEN_LVL_0_25);
   HAL_Delay(1);
   drv_write_CSACR(drv, 0x0, 0x1, 0x0, CSA_GAIN, 0x1, 0x0, 0x0, 0x0, SEN_LVL_0_25);
@@ -231,7 +320,7 @@ int main(void)
   HAL_Delay(1);
   drv_disable_gd(drv);
   HAL_Delay(1);
-  //drv_enable_gd(drv);   */
+  // drv_enable_gd(drv);   */
   printf("ADC A OFFSET: %d     ADC B OFFSET: %d\r\n", controller.adc_a_offset, controller.adc_b_offset);
 
   /* Turn on PWM */
@@ -242,11 +331,11 @@ int main(void)
   /* CAN setup */
   can_rx_init(&can_rx);
   can_tx_init(&can_tx);
-  HAL_CAN_Start(&CAN_H); //start CAN
+  HAL_CAN_Start(&CAN_H); // start CAN
   //__HAL_CAN_ENABLE_IT(&CAN_H, CAN_IT_RX_FIFO0_MSG_PENDING); // Start can interrupt
 
   /* Set Interrupt Priorities */
-  HAL_NVIC_SetPriority(PWM_ISR, 0x0,0x0); // commutation > communication
+  HAL_NVIC_SetPriority(PWM_ISR, 0x0, 0x0); // commutation > communication
   HAL_NVIC_SetPriority(CAN_ISR, 0x01, 0x01);
 
   /* Start the FSM */
@@ -254,23 +343,31 @@ int main(void)
   state.next_state = MENU_MODE;
   state.ready = 1;
 
-
   /* Turn on interrupts */
   HAL_UART_Receive_IT(&huart2, (uint8_t *)Serial2RxBuffer, 1);
   HAL_TIM_Base_Start_IT(&htim1);
 
   /* USER CODE END 2 */
+  HAL_Delay(100);
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
 
-	  HAL_Delay(100);
-	  drv_print_faults(drv);
-	 // if(state.state==MOTOR_MODE){
-	  	  //printf("%.2f %.2f %.2f %.2f %.2f\r\n", controller.p_des, controller.v_des, controller.kp, controller.kd, controller.t_ff);
-	  //}
+    drv_print_faults(drv);
+    uint32_t TxMailbox=0;
+    if(HAL_CAN_AddTxMessage(&CAN_H, &can_tx.tx_header, can_tx.data, &TxMailbox)==HAL_ERROR)
+    {
+    	int a;
+    	a=50;
+    	int b=10;
+    	a=b;
+    }
+    // if(state.state==MOTOR_MODE){
+    // printf("%.2f %.2f %.2f %.2f %.2f\r\n", controller.p_des, controller.v_des, controller.kp, controller.kd, controller.t_ff);
+    //}
+    HAL_Delay(1000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -279,22 +376,22 @@ int main(void)
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-  */
+   */
   __HAL_RCC_PWR_CLK_ENABLE();
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
+   * in the RCC_OscInitTypeDef structure.
+   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -310,16 +407,15 @@ void SystemClock_Config(void)
   }
 
   /** Activate the Over-Drive mode
-  */
+   */
   if (HAL_PWREx_EnableOverDrive() != HAL_OK)
   {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+   */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
@@ -333,12 +429,20 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM8) // If the interrupt is from TIM8
+  {
+    hall_sensor_update(&hall_sensor, hall_sensor_get_state_from_gpio(), htim->Instance->CCR1); // Update the Hall sensor state
+  }
+}
+
 /* USER CODE END 4 */
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -348,12 +452,12 @@ void Error_Handler(void)
 }
 #ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */

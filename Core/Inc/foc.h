@@ -9,7 +9,7 @@
 #define INC_FOC_H_
 
 #include <stdint.h>
-#include "position_sensor.h"
+#include "encoder_struct.h"
 
 
 typedef struct{
@@ -18,7 +18,7 @@ typedef struct{
     float i_a, i_b, i_c;                                    // Phase currents
     float v_bus, v_bus_filt;                                // DC link voltage
     float theta_mech, theta_elec;                           // Rotor mechanical and electrical angle
-    float dtheta_mech, dtheta_elec, dtheta_elec_filt;       // Rotor mechanical and electrical angular velocit
+    float dtheta_mech, dtheta_elec, dtheta_elec_filt;       // Rotor mechanical and electrical angular velocity
     float i_d, i_q, i_q_filt, i_d_filt;                     // D/Q currents
     float i_mag, i_mag_max;											// Current magnitude
     float v_d, v_q;                                         // D/Q voltages
@@ -29,7 +29,7 @@ typedef struct{
     float d_int, q_int;                                     // Current error integrals
     int adc_a_offset, adc_b_offset, adc_c_offset, adc_vbus_offset; 		// ADC offsets
     float i_d_des, i_q_des, i_d_des_filt, i_q_des_filt, t_ff_filt;     // Current references
-    int loop_count;                                         // Degubbing counter
+    int loop_count;                                         // Debugging counter
     int timeout;                                            // Watchdog counter
     int mode;
     int ovp_flag;                                           // Over-voltage flag
@@ -67,7 +67,7 @@ void zero_current(ControllerStruct *controller);
 void reset_foc(ControllerStruct *controller);
 void reset_observer(ObserverStruct *observer);
 void init_controller_params(ControllerStruct *controller);
-void commutate(ControllerStruct *controller, EncoderStruct *encoder);
+void commutate(ControllerStruct *controller, BasicEncoderStruct *encoder);
 void torque_control(ControllerStruct *controller);
 void limit_current_ref (ControllerStruct *controller);
 void update_observer(ControllerStruct *controller, ObserverStruct *observer);
