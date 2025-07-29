@@ -68,4 +68,5 @@ void hall_sensor_update(HallSensorStruct *h, uint8_t new_hall_state, uint16_t cu
  */
 void hall_sensor_get_estimate_angle(HallSensorStruct *h, uint16_t current_time_ticks, BasicEncoderStruct *res);
 
+void hall_sensor_overflow(HallSensorStruct *h, BasicEncoderStruct *res);
 #endif /* INC_HALL_SENSOR_H_ */

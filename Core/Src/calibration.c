@@ -24,6 +24,8 @@ void order_phases(BasicEncoderStruct *encoder, ControllerStruct *controller, Cal
     printf("Checking phase sign, pole pairs\r\n");
     cal->started = 1;
     cal->start_count = loop_count;
+    cal->phase_order = 0;
+    PHASE_ORDER = 0;
   }
   cal->time = (float)(loop_count - cal->start_count) * DT;
 

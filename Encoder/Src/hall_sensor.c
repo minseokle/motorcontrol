@@ -62,6 +62,10 @@ uint8_t hall_sensor_get_state_from_gpio()
 
 void hall_sensor_init(HallSensorStruct *h, uint8_t new_hall_state, float pole_pairs)
 {
+  if (new_hall_state == 0 || new_hall_state > 6 )
+  {
+    new_hall_state=0;
+  }
   h->hall_state = new_hall_state;
   h->prev_hall_state = new_hall_state; // Initialize previous state to current state
   h->electrical_angle_rad = hall_state_angle_lut[new_hall_state];
@@ -128,9 +132,9 @@ void hall_sensor_update(HallSensorStruct *h, uint8_t new_hall_state, uint16_t cu
     h->is_stop = 1;
   }
 
-  if(h->is_stop)
+  if (h->is_stop)
   {
-	    h->electrical_velocity_rad_s = 0.0;
+    h->electrical_velocity_rad_s = 0.0;
   }
   else if (delta_time_ticks > 0)
   {
@@ -154,7 +158,7 @@ void hall_sensor_get_estimate_angle(HallSensorStruct *h, uint16_t current_time_t
 
   // Calculate interpolated offset from the last Hall angle.
   float angle_offset = h->electrical_velocity_rad_s * ((float)time_since_last_event_ticks * TIMER_TICK_S);
-  if (angle_offset > PI_OVER_3_F)
+  if (current_time_ticks * TIMER_TICK_S > 1.0 || angle_offset > PI_OVER_3_F || angle_offset < -PI_OVER_3_F)
   {
     h->electrical_velocity_rad_s = 0.0;
     h->is_ovf = 1;
@@ -198,6 +202,45 @@ void hall_sensor_get_estimate_angle(HallSensorStruct *h, uint16_t current_time_t
   res->elec_velocity = h->electrical_velocity_rad_s;
 
   float machine_single_turn = (single_turn_angle + TWO_PI_F * h->multiturn_cnt) / h->pole_pairs / TWO_PI_F;
+  int machine_single_turn_int = (int)machine_single_turn;
+
+  res->angle_singleturn_raw = (machine_single_turn - machine_single_turn_int) * TWO_PI_F;
+
+  res->angle_singleturn = (machine_single_turn - machine_single_turn_int) * TWO_PI_F;
+  res->angle_multiturn = (single_turn_angle + TWO_PI_F * h->multiturn_cnt) / h->pole_pairs;
+  res->velocity = h->electrical_velocity_rad_s / h->pole_pairs;
+}
+
+void hall_sensor_overflow(HallSensorStruct *h, BasicEncoderStruct *res)
+{
+
+  h->electrical_velocity_rad_s = 0.0;
+  h->is_ovf = 1;
+  h->is_stop = 1;
+
+  // Estimate current angle.
+  float base_angle = hall_state_angle_lut[h->hall_state];
+  float estimated_angle, single_turn_angle;
+
+  estimated_angle = base_angle;
+
+  single_turn_angle = estimated_angle;
+  // Normalize angle to the range 0 ~ 2*PI.
+  float e_zero_pp = E_ZERO * TWO_PI_F * h->pole_pairs / ENC_CPR;
+
+  estimated_angle -= e_zero_pp;
+
+  estimated_angle = fmodf(estimated_angle, TWO_PI_F);
+  if (estimated_angle < 0.0f)
+  {
+    estimated_angle += TWO_PI_F;
+  }
+
+  h->electrical_angle_rad = estimated_angle;
+  res->elec_angle = h->electrical_angle_rad;
+  res->elec_velocity = h->electrical_velocity_rad_s;
+
+  float machine_single_turn = (single_turn_angle / TWO_PI_F + h->multiturn_cnt) / h->pole_pairs;
   int machine_single_turn_int = (int)machine_single_turn;
 
   res->angle_singleturn_raw = (machine_single_turn - machine_single_turn_int) * TWO_PI_F;

@@ -226,7 +226,7 @@ void CAN1_RX0_IRQHandler(void)
   HAL_CAN_GetRxMessage(&CAN_H, CAN_RX_FIFO0, &can_rx.rx_header, can_rx.data); // Read CAN
   uint32_t TxMailbox;
   pack_reply(&can_tx, CAN_ID, basic_encoder.angle_multiturn / GR, basic_encoder.velocity / GR, controller.i_q_filt * KT * GR, controller.v_bus_filt); // Pack response
-  HAL_CAN_AddTxMessage(&CAN_H, &can_tx.tx_header, can_tx.data, &TxMailbox);                                                                            // Send response
+  HAL_CAN_AddTxMessage(&CAN_H, &can_tx.tx_header, can_tx.data, &TxMailbox);                                                                           // Send response
 
   /* Check for special Commands */
   if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) & (can_rx.data[3] == 0xFF) & (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) & (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFC)))
@@ -261,15 +261,15 @@ void TIM1_UP_TIM10_IRQHandler(void)
   /* Sample ADCs */
   analog_sample(&controller);
 
-  if(ENCODER_TYPE == ENCODER_ABS)
+  if (ENCODER_TYPE == ENCODER_ABS)
   {
     /* Sample absolute encoder */
     ps_sample(&abs_encoder, DT);
   }
-  else if(ENCODER_TYPE == ENCODER_HALL)
+  else if (ENCODER_TYPE == ENCODER_HALL)
   {
-    //TODO: Implement Hall sensor sampling
-    hall_sensor_get_estimate_angle(&hall_sensor,htim8.Instance->CNT,&basic_encoder);
+    // TODO: Implement Hall sensor sampling
+    hall_sensor_get_estimate_angle(&hall_sensor, htim8.Instance->CNT, &basic_encoder);
   }
 
   /* Run Finite State Machine */
@@ -294,7 +294,6 @@ void TIM1_UP_TIM10_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
-
 
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
@@ -328,7 +327,7 @@ void can_tx_rx(void)
   {
     uint32_t TxMailbox;
     pack_reply(&can_tx, CAN_ID, basic_encoder.angle_multiturn / GR, basic_encoder.velocity / GR, controller.i_mag_max * KT * GR, controller.v_max - controller.v_ref); // Pack response
-    HAL_CAN_AddTxMessage(&CAN_H, &can_tx.tx_header, can_tx.data, &TxMailbox);                                                                                           // Send response
+    HAL_CAN_AddTxMessage(&CAN_H, &can_tx.tx_header, can_tx.data, &TxMailbox);                                                                                          // Send response
 
     /* Check for special Commands */
     if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) & (can_rx.data[3] == 0xFF) & (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) & (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFC)))

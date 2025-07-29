@@ -20,11 +20,11 @@ uint16_t drv_spi_write(DRVStruct * drv, uint16_t val){
 	return drv->spi_rx_word;
 }
 uint16_t drv_read_FSR1(DRVStruct drv){
-	return drv_spi_write(&drv, (1<<15)|FSR1);
+	return drv_spi_write(&drv, (1<<15)|(FSR1<<11));
 }
 
 uint16_t drv_read_FSR2(DRVStruct drv){
-	return drv_spi_write(&drv, (1<<15)|FSR2);
+	return drv_spi_write(&drv, (1<<15)|(FSR2<<11));
 }
 
 uint16_t drv_read_register(DRVStruct drv, int reg){

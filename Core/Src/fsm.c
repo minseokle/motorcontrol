@@ -67,17 +67,17 @@ void run_fsm(FSMStruct *fsmstate)
         memcpy(&abs_encoder.offset_lut, comm_encoder_cal.lut_arr, sizeof(abs_encoder.offset_lut));
         memcpy(&ENCODER_LUT, comm_encoder_cal.lut_arr, sizeof(comm_encoder_cal.lut_arr));
         // for(int i = 0; i<128; i++){printf("%d\r\n", ENCODER_LUT[i]);}
-        if (!preference_writer_ready(prefs))
-        {
-          preference_writer_open(&prefs);
-        }
-        preference_writer_flush(&prefs);
-        preference_writer_close(&prefs);
-        preference_writer_load(prefs);
       }
       else if (ENCODER_TYPE == ENCODER_HALL)
       {
       }
+      if (!preference_writer_ready(prefs))
+      {
+        preference_writer_open(&prefs);
+      }
+      preference_writer_flush(&prefs);
+      preference_writer_close(&prefs);
+      preference_writer_load(prefs);
       update_fsm(fsmstate, 27);
     }
 
@@ -85,6 +85,7 @@ void run_fsm(FSMStruct *fsmstate)
 
   case MOTOR_MODE:
     /* If CAN has timed out, reset all commands */
+    //TODO: only test 
     if ((CAN_TIMEOUT > 0) && (controller.timeout > CAN_TIMEOUT))
     {
       zero_commands(&controller);
@@ -134,6 +135,12 @@ void fsm_enter_state(FSMStruct *fsmstate)
     HAL_GPIO_WritePin(LED, GPIO_PIN_RESET);
     reset_foc(&controller);
     drv_enable_gd(drv);
+    //TODO: only test 
+      // controller.commands[0] = 0.0;
+      // controller.commands[1] = 0.0;
+      // controller.commands[2] = 10.0;
+      // controller.commands[3] = 0.5;
+      // controller.commands[4] = 0.0;
     break;
   case CALIBRATION_MODE:
     // printf("Entering Calibration Mode\r\n");
@@ -220,6 +227,7 @@ void update_fsm(FSMStruct *fsmstate, char fsm_input)
     case MOTOR_CMD:
       fsmstate->next_state = MOTOR_MODE;
       fsmstate->ready = 0;
+      
       break;
     case ENCODER_CMD:
       fsmstate->next_state = ENCODER_MODE;
