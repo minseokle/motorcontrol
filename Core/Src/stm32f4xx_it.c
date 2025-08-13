@@ -19,21 +19,23 @@
 /* USER CODE END Header */
 
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
 #include "stm32f4xx_it.h"
+
+#include "main.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+
+#include "adc.h"
+#include "can.h"
+#include "foc.h"
+#include "fsm.h"
+#include "gpio.h"
+#include "hw_config.h"
+#include "position_sensor.h"
+#include "spi.h"
 #include "structs.h"
 #include "usart.h"
-#include "fsm.h"
-#include "spi.h"
-#include "gpio.h"
-#include "adc.h"
-#include "foc.h"
-#include "can.h"
-#include "position_sensor.h"
-#include "hw_config.h"
 #include "user_config.h"
 /* USER CODE END Includes */
 
@@ -80,8 +82,8 @@ extern UART_HandleTypeDef huart2;
 /*           Cortex-M4 Processor Interruption and Exception Handlers          */
 /******************************************************************************/
 /**
-  * @brief This function handles Non maskable interrupt.
-  */
+ * @brief This function handles Non maskable interrupt.
+ */
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
@@ -93,68 +95,64 @@ void NMI_Handler(void)
 }
 
 /**
-  * @brief This function handles Hard fault interrupt.
-  */
+ * @brief This function handles Hard fault interrupt.
+ */
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
 
   /* USER CODE END HardFault_IRQn 0 */
-  while (1)
-  {
+  while (1) {
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
 }
 
 /**
-  * @brief This function handles Memory management fault.
-  */
+ * @brief This function handles Memory management fault.
+ */
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
 
   /* USER CODE END MemoryManagement_IRQn 0 */
-  while (1)
-  {
+  while (1) {
     /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
     /* USER CODE END W1_MemoryManagement_IRQn 0 */
   }
 }
 
 /**
-  * @brief This function handles Pre-fetch fault, memory access fault.
-  */
+ * @brief This function handles Pre-fetch fault, memory access fault.
+ */
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
 
   /* USER CODE END BusFault_IRQn 0 */
-  while (1)
-  {
+  while (1) {
     /* USER CODE BEGIN W1_BusFault_IRQn 0 */
     /* USER CODE END W1_BusFault_IRQn 0 */
   }
 }
 
 /**
-  * @brief This function handles Undefined instruction or illegal state.
-  */
+ * @brief This function handles Undefined instruction or illegal state.
+ */
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
 
   /* USER CODE END UsageFault_IRQn 0 */
-  while (1)
-  {
+  while (1) {
     /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
     /* USER CODE END W1_UsageFault_IRQn 0 */
   }
 }
 
 /**
-  * @brief This function handles System service call via SWI instruction.
-  */
+ * @brief This function handles System service call via SWI instruction.
+ */
 void SVC_Handler(void)
 {
   /* USER CODE BEGIN SVCall_IRQn 0 */
@@ -166,8 +164,8 @@ void SVC_Handler(void)
 }
 
 /**
-  * @brief This function handles Debug monitor.
-  */
+ * @brief This function handles Debug monitor.
+ */
 void DebugMon_Handler(void)
 {
   /* USER CODE BEGIN DebugMonitor_IRQn 0 */
@@ -179,8 +177,8 @@ void DebugMon_Handler(void)
 }
 
 /**
-  * @brief This function handles Pendable request for system service.
-  */
+ * @brief This function handles Pendable request for system service.
+ */
 void PendSV_Handler(void)
 {
   /* USER CODE BEGIN PendSV_IRQn 0 */
@@ -192,8 +190,8 @@ void PendSV_Handler(void)
 }
 
 /**
-  * @brief This function handles System tick timer.
-  */
+ * @brief This function handles System tick timer.
+ */
 void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
@@ -213,8 +211,8 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
-  * @brief This function handles CAN1 RX0 interrupt.
-  */
+ * @brief This function handles CAN1 RX0 interrupt.
+ */
 void CAN1_RX0_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN1_RX0_IRQn 0 */
@@ -224,13 +222,12 @@ void CAN1_RX0_IRQHandler(void)
   /* USER CODE BEGIN CAN1_RX0_IRQn 1 */
   can_tx_rx();
 
-
   /* USER CODE END CAN1_RX0_IRQn 1 */
 }
 
 /**
-  * @brief This function handles TIM1 update interrupt and TIM10 global interrupt.
-  */
+ * @brief This function handles TIM1 update interrupt and TIM10 global interrupt.
+ */
 void TIM1_UP_TIM10_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM1_UP_TIM10_IRQn 0 */
@@ -239,13 +236,10 @@ void TIM1_UP_TIM10_IRQHandler(void)
   /* Sample ADCs */
   analog_sample(&controller);
 
-  if (ENCODER_TYPE == ENCODER_ABS)
-  {
+  if (ENCODER_TYPE == ENCODER_ABS) {
     /* Sample absolute encoder */
     ps_sample(&abs_encoder, DT);
-  }
-  else if (ENCODER_TYPE == ENCODER_HALL)
-  {
+  } else if (ENCODER_TYPE == ENCODER_HALL) {
     // TODO: Implement Hall sensor sampling
     hall_sensor_get_estimate_angle(&hall_sensor, htim8.Instance->CNT, &basic_encoder);
   }
@@ -267,8 +261,8 @@ void TIM1_UP_TIM10_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles USART2 global interrupt.
-  */
+ * @brief This function handles USART2 global interrupt.
+ */
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
@@ -282,8 +276,8 @@ void USART2_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles TIM8 capture compare interrupt.
-  */
+ * @brief This function handles TIM8 capture compare interrupt.
+ */
 void TIM8_CC_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM8_CC_IRQn 0 */
@@ -299,31 +293,31 @@ void TIM8_CC_IRQHandler(void)
 
 void can_tx_rx(void)
 {
-
-  int no_message = HAL_CAN_GetRxMessage(&CAN_H, CAN_RX_FIFO0, &can_rx.rx_header, can_rx.data); // Read CAN
-  if (!no_message)
-  {
+  int no_message =
+    HAL_CAN_GetRxMessage(&CAN_H, CAN_RX_FIFO0, &can_rx.rx_header, can_rx.data);  // Read CAN
+  if (!no_message) {
     uint32_t TxMailbox;
-    pack_reply(&can_tx, CAN_ID, basic_encoder.angle_multiturn / GR, basic_encoder.velocity / GR, controller.i_mag_max * KT * GR, controller.v_max - controller.v_ref); // Pack response
-    HAL_CAN_AddTxMessage(&CAN_H, &can_tx.tx_header, can_tx.data, &TxMailbox);                                                                                          // Send response
+    pack_reply(
+      &can_tx, CAN_ID, basic_encoder.angle_multiturn / GR, basic_encoder.velocity / GR,
+      controller.i_mag_max * KT * GR, controller.v_max - controller.v_ref);    // Pack response
+    HAL_CAN_AddTxMessage(&CAN_H, &can_tx.tx_header, can_tx.data, &TxMailbox);  // Send response
 
     /* Check for special Commands */
-    if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) & (can_rx.data[3] == 0xFF) & (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) & (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFC)))
-    {
+    if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) &
+         (can_rx.data[3] == 0xFF) & (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) &
+         (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFC))) {
       update_fsm(&state, MOTOR_CMD);
-    }
-    else if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) & (can_rx.data[3] == 0xFF) * (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) & (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFD)))
-    {
+    } else if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) &
+                (can_rx.data[3] == 0xFF) * (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) &
+                (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFD))) {
       update_fsm(&state, MENU_CMD);
-    }
-    else if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) & (can_rx.data[3] == 0xFF) * (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) & (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFE)))
-    {
+    } else if (((can_rx.data[0] == 0xFF) & (can_rx.data[1] == 0xFF) & (can_rx.data[2] == 0xFF) &
+                (can_rx.data[3] == 0xFF) * (can_rx.data[4] == 0xFF) & (can_rx.data[5] == 0xFF) &
+                (can_rx.data[6] == 0xFF) & (can_rx.data[7] == 0xFE))) {
       update_fsm(&state, ZERO_CMD);
-    }
-    else
-    {
-      unpack_cmd(can_rx, controller.commands); // Unpack commands
-      controller.timeout = 0;                  // Reset timeout counter
+    } else {
+      unpack_cmd(can_rx, controller.commands);  // Unpack commands
+      controller.timeout = 0;                   // Reset timeout counter
       controller.i_mag_max = controller.i_q;
     }
   }

@@ -5,9 +5,10 @@
  *      Author: ben
  */
 
-#include "main.h"
 #include "preference_writer.h"
+
 #include "flash_writer.h"
+#include "main.h"
 #include "user_config.h"
 /*
 PreferenceWriter::PreferenceWriter(uint32_t sector) {
@@ -17,13 +18,13 @@ PreferenceWriter::PreferenceWriter(uint32_t sector) {
 }
 */
 
-void preference_writer_init(PreferenceWriter *pr, uint32_t sector)
+void preference_writer_init(PreferenceWriter * pr, uint32_t sector)
 {
   flash_writer_init(&pr->fw, sector);
   pr->sector = sector;
 }
 
-void preference_writer_open(PreferenceWriter *pr)
+void preference_writer_open(PreferenceWriter * pr)
 {
   flash_writer_open(&pr->fw);
   pr->ready = true;
@@ -49,15 +50,13 @@ void preference_writer_write_float(float x, int index)
  * This function writes all the integer and float registers to flash.
  * It should be called when the preferences are modified and need to be saved.
  */
-void preference_writer_flush(PreferenceWriter *pr)
+void preference_writer_flush(PreferenceWriter * pr)
 {
   int offs;
-  for (offs = 0; offs < INT_REG_SIZE; offs++)
-  {
+  for (offs = 0; offs < INT_REG_SIZE; offs++) {
     flash_writer_write_int(pr->fw, offs, __int_reg[offs]);
   }
-  for (; offs < INT_REG_SIZE + FLOAT_REG_SIZE; offs++)
-  {
+  for (; offs < INT_REG_SIZE + FLOAT_REG_SIZE; offs++) {
     flash_writer_write_float(pr->fw, offs, __float_reg[offs - INT_REG_SIZE]);
   }
   pr->ready = false;
@@ -66,17 +65,15 @@ void preference_writer_flush(PreferenceWriter *pr)
 void preference_writer_load(PreferenceWriter pr)
 {
   int offs;
-  for (offs = 0; offs < INT_REG_SIZE; offs++)
-  {
+  for (offs = 0; offs < INT_REG_SIZE; offs++) {
     __int_reg[offs] = flash_read_int(pr.fw, offs);
   }
-  for (; offs < INT_REG_SIZE + FLOAT_REG_SIZE; offs++)
-  {
+  for (; offs < INT_REG_SIZE + FLOAT_REG_SIZE; offs++) {
     __float_reg[offs - INT_REG_SIZE] = flash_read_float(pr.fw, offs);
   }
 }
 
-void preference_writer_close(PreferenceWriter *pr)
+void preference_writer_close(PreferenceWriter * pr)
 {
   pr->ready = false;
   flash_writer_close(&pr->fw);

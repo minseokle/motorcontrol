@@ -8,30 +8,29 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
-
-
-
 #include <stdint.h>
-#include "spi.h"
-#include "gpio.h"
+
 #include "adc.h"
-#include "tim.h"
-#include "encoder_struct.h"
-#include "position_sensor.h"
-#include "hall_sensor.h"
-#include "preference_writer.h"
-#include "fsm.h"
-#include "drv8323.h"
-#include "foc.h"
 #include "calibration.h"
 #include "can.h"
+#include "drv8323.h"
+#include "encoder_struct.h"
+#include "foc.h"
+#include "fsm.h"
+#include "gpio.h"
+#include "hall_sensor.h"
+#include "position_sensor.h"
+#include "preference_writer.h"
+#include "spi.h"
+#include "tim.h"
 
-typedef struct{
-    } GPIOStruct;
+typedef struct
+{
+} GPIOStruct;
 
-typedef struct{
-    }COMStruct;
-
+typedef struct
+{
+} COMStruct;
 
 /* Global Structs */
 extern ControllerStruct controller;

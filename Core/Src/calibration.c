@@ -6,21 +6,23 @@
  */
 
 #include "calibration.h"
-#include "hw_config.h"
-#include "user_config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include "usart.h"
-#include "math_ops.h"
 
-void order_phases(BasicEncoderStruct *encoder, ControllerStruct *controller, CalStruct *cal, int loop_count)
+#include "hw_config.h"
+#include "math_ops.h"
+#include "usart.h"
+#include "user_config.h"
+
+void order_phases(
+  BasicEncoderStruct * encoder, ControllerStruct * controller, CalStruct * cal, int loop_count)
 {
   /* Checks phase order, to ensure that positive Q current produces
      torque in the positive direction wrt the position sensor */
   // PHASE_ORDER = 0;
 
-  if (!cal->started)
-  {
+  if (!cal->started) {
     printf("Checking phase sign, pole pairs\r\n");
     cal->started = 1;
     cal->start_count = loop_count;
@@ -29,10 +31,9 @@ void order_phases(BasicEncoderStruct *encoder, ControllerStruct *controller, Cal
   }
   cal->time = (float)(loop_count - cal->start_count) * DT;
 
-  if (cal->time < T1)
-  {
+  if (cal->time < T1) {
     // Set voltage angle to zero, wait for rotor position to settle
-    cal->theta_ref = 0; // W_CAL*cal->time;
+    cal->theta_ref = 0;  // W_CAL*cal->time;
     cal->cal_position.elec_angle = cal->theta_ref;
     cal->cal_position.elec_velocity = 0;
     controller->i_d_des = I_CAL;
@@ -42,8 +43,7 @@ void order_phases(BasicEncoderStruct *encoder, ControllerStruct *controller, Cal
     return;
   }
 
-  else if (cal->time < T1 + 2.0f * PI_F / W_CAL)
-  {
+  else if (cal->time < T1 + 2.0f * PI_F / W_CAL) {
     // rotate voltage vector through one electrical cycle
     cal->theta_ref = W_CAL * (cal->time - T1);
     cal->cal_position.elec_angle = cal->theta_ref;
@@ -56,13 +56,10 @@ void order_phases(BasicEncoderStruct *encoder, ControllerStruct *controller, Cal
   float theta_end = encoder->angle_multiturn;
   cal->ppairs = round(2.0f * PI_F / fabsf(theta_end - cal->theta_start));
 
-  if (cal->theta_start < theta_end)
-  {
+  if (cal->theta_start < theta_end) {
     cal->phase_order = 0;
     printf("Phase order correct\r\n");
-  }
-  else
-  {
+  } else {
     cal->phase_order = 1;
     printf("Swapping phase sign\r\n");
   }
@@ -71,16 +68,16 @@ void order_phases(BasicEncoderStruct *encoder, ControllerStruct *controller, Cal
   PHASE_ORDER = cal->phase_order;
   PPAIRS = (float)cal->ppairs;
   cal->started = 0;
-  cal->done_ordering = 1; // Finished checking phase order
+  cal->done_ordering = 1;  // Finished checking phase order
 }
 
-void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_sensor, ControllerStruct *controller, CalStruct *cal,
-                            int loop_count)
+void calibrate_hall_encoder(
+  BasicEncoderStruct * encoder, HallSensorStruct * hall_sensor, ControllerStruct * controller,
+  CalStruct * cal, int loop_count)
 {
   /* Calibrates e-zero and encoder nonliearity */
 
-  if (!cal->started)
-  {
+  if (!cal->started) {
     printf("Starting offset cal \r\n");
     cal->started = 1;
     cal->start_count = loop_count;
@@ -91,10 +88,9 @@ void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_
 
   cal->time = (float)(loop_count - cal->start_count) * DT;
 
-  if (cal->time < T1)
-  {
+  if (cal->time < T1) {
     // Set voltage angle to zero, wait for rotor position to settle
-    cal->theta_ref = 0; // W_CAL*cal->time;
+    cal->theta_ref = 0;  // W_CAL*cal->time;
     cal->cal_position.elec_angle = cal->theta_ref;
     controller->i_d_des = I_CAL;
     controller->i_q_des = 0.0f;
@@ -103,52 +99,55 @@ void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_
     cal->theta_start = encoder->angle_multiturn;
     cal->next_sample_time = cal->time;
     return;
-  }
-  else if (cal->time < T1 + 2.0f * PI_F * hall_sensor->pole_pairs / W_CAL)
-  {
+  } else if (cal->time < T1 + 2.0f * PI_F * hall_sensor->pole_pairs / W_CAL) {
     // rotate voltage vector through one mechanical rotation in the positive direction
-    cal->theta_ref += W_CAL * DT; //(cal->time-T1);
+    cal->theta_ref += W_CAL * DT;  //(cal->time-T1);
     cal->cal_position.elec_angle = cal->theta_ref;
     commutate(controller, &cal->cal_position);
 
     // sample SAMPLES_PER_PPAIR times per pole-pair
-    if (cal->time > cal->next_sample_time)
-    {
-      printf("%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction, hall_sensor->electrical_velocity_rad_s);
+    if (cal->time > cal->next_sample_time) {
+      printf(
+        "%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction,
+        hall_sensor->electrical_velocity_rad_s);
 
       int count_ref = cal->theta_ref * (float)ENC_CPR / (2.0f * PI_F * hall_sensor->pole_pairs);
-      int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F - count_ref; //- encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
+      int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F -
+                  count_ref;  //- encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
       cal->error_arr[cal->sample_count] = error + ENC_CPR * (error < 0);
-      printf("%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref, encoder->elec_angle);
+      printf(
+        "%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count],
+        cal->theta_ref, encoder->elec_angle);
       cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
-      if (cal->sample_count == hall_sensor->pole_pairs * SAMPLES_PER_PPAIR - 1)
-      {
+      if (cal->sample_count == hall_sensor->pole_pairs * SAMPLES_PER_PPAIR - 1) {
         return;
       }
       cal->sample_count++;
     }
     return;
-  }
-  else if (cal->time < T1 + 4.0f * PI_F * hall_sensor->pole_pairs / W_CAL)
-  {
+  } else if (cal->time < T1 + 4.0f * PI_F * hall_sensor->pole_pairs / W_CAL) {
     // rotate voltage vector through one mechanical rotation in the negative direction
-    cal->theta_ref -= W_CAL * DT; //(cal->time-T1);
+    cal->theta_ref -= W_CAL * DT;  //(cal->time-T1);
     controller->i_d_des = I_CAL;
     controller->i_q_des = 0.0f;
     cal->cal_position.elec_angle = cal->theta_ref;
     commutate(controller, &cal->cal_position);
 
     // sample SAMPLES_PER_PPAIR times per pole-pair
-    if ((cal->time > cal->next_sample_time) && (cal->sample_count > 0))
-    {
-      printf("%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction, hall_sensor->electrical_velocity_rad_s);
+    if ((cal->time > cal->next_sample_time) && (cal->sample_count > 0)) {
+      printf(
+        "%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction,
+        hall_sensor->electrical_velocity_rad_s);
 
       int count_ref = cal->theta_ref * (float)ENC_CPR / (2.0f * PI_F * hall_sensor->pole_pairs);
-      int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F - count_ref; // - encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
+      int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F -
+                  count_ref;  // - encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
       error = error + ENC_CPR * (error < 0);
 
       cal->error_arr[cal->sample_count] = (cal->error_arr[cal->sample_count] + error) / 2;
-      printf("%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref, encoder->elec_angle);
+      printf(
+        "%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count],
+        cal->theta_ref, encoder->elec_angle);
       cal->sample_count--;
       cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
     }
@@ -159,8 +158,7 @@ void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_
 
   // Calculate average offset
   int ezero_mean = 0;
-  for (int i = 0; i < ((int)hall_sensor->pole_pairs * SAMPLES_PER_PPAIR); i++)
-  {
+  for (int i = 0; i < ((int)hall_sensor->pole_pairs * SAMPLES_PER_PPAIR); i++) {
     ezero_mean += cal->error_arr[i];
   }
   cal->ezero = ezero_mean / (SAMPLES_PER_PPAIR * hall_sensor->pole_pairs);
@@ -169,7 +167,9 @@ void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_
   cal->done_cal = 1;
 }
 
-void calibrate_abs_encoder(BasicEncoderStruct *encoder, AbsEncoderStruct *abs_encoder, ControllerStruct *controller, CalStruct *cal, int loop_count)
+void calibrate_abs_encoder(
+  BasicEncoderStruct * encoder, AbsEncoderStruct * abs_encoder, ControllerStruct * controller,
+  CalStruct * cal, int loop_count)
 {
   // /* Calibrates e-zero and encoder nonliearity */
 
@@ -210,9 +210,9 @@ void calibrate_abs_encoder(BasicEncoderStruct *encoder, AbsEncoderStruct *abs_en
   //     int count_ref = cal->theta_ref * (float)ENC_CPR / (2.0f * PI_F * PPAIRS);
   //     int error = encoder->raw - count_ref; //- encoder->raw;
   //     cal->error_arr[cal->sample_count] = error + ENC_CPR * (error < 0);
-  //     printf("%d %d %d %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref);
-  //     cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
-  //     if (cal->sample_count == PPAIRS * SAMPLES_PER_PPAIR - 1)
+  //     printf("%d %d %d %.3f\r\n", cal->sample_count, count_ref,
+  //     cal->error_arr[cal->sample_count], cal->theta_ref); cal->next_sample_time += 2.0f * PI_F /
+  //     (W_CAL * SAMPLES_PER_PPAIR); if (cal->sample_count == PPAIRS * SAMPLES_PER_PPAIR - 1)
   //     {
   //       return;
   //     }
@@ -237,8 +237,8 @@ void calibrate_abs_encoder(BasicEncoderStruct *encoder, AbsEncoderStruct *abs_en
   //     error = error + ENC_CPR * (error < 0);
 
   //     cal->error_arr[cal->sample_count] = (cal->error_arr[cal->sample_count] + error) / 2;
-  //     printf("%d %d %d %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref);
-  //     cal->sample_count--;
+  //     printf("%d %d %d %.3f\r\n", cal->sample_count, count_ref,
+  //     cal->error_arr[cal->sample_count], cal->theta_ref); cal->sample_count--;
   //     cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
   //   }
   //   return;
@@ -288,6 +288,7 @@ void calibrate_abs_encoder(BasicEncoderStruct *encoder, AbsEncoderStruct *abs_en
   // cal->done_cal = 1;
 }
 
-void measure_lr(BasicEncoderStruct *encoder, ControllerStruct *controller, CalStruct *cal, int loop_count)
+void measure_lr(
+  BasicEncoderStruct * encoder, ControllerStruct * controller, CalStruct * cal, int loop_count)
 {
 }

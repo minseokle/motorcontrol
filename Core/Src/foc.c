@@ -6,41 +6,37 @@
  */
 
 #include "foc.h"
+
 #include "adc.h"
-#include "tim.h"
 #include "encoder_struct.h"
-#include "math_ops.h"
 #include "hw_config.h"
+#include "math_ops.h"
+#include "tim.h"
 #include "user_config.h"
 
 /**
  * @brief Set the duty cycle for the inverter
  * @param controller Pointer to the ControllerStruct containing the duty cycle values
  */
-void set_dtc(ControllerStruct *controller)
+void set_dtc(ControllerStruct * controller)
 {
-
   /* Invert duty cycle if that's how hardware is configured */
 
   float dtc_u = controller->dtc_u;
   float dtc_v = controller->dtc_v;
   float dtc_w = controller->dtc_w;
 
-  if (INVERT_DTC)
-  {
+  if (INVERT_DTC) {
     dtc_u = 1.0f - controller->dtc_u;
     dtc_v = 1.0f - controller->dtc_v;
     dtc_w = 1.0f - controller->dtc_w;
   }
   /* Handle phase order swapping so that voltage/current/torque match encoder direction */
-  if (!PHASE_ORDER)
-  {
+  if (!PHASE_ORDER) {
     __HAL_TIM_SET_COMPARE(&TIM_PWM, TIM_CH_U, ((TIM_PWM.Instance->ARR)) * dtc_u);
     __HAL_TIM_SET_COMPARE(&TIM_PWM, TIM_CH_V, ((TIM_PWM.Instance->ARR)) * dtc_v);
     __HAL_TIM_SET_COMPARE(&TIM_PWM, TIM_CH_W, ((TIM_PWM.Instance->ARR)) * dtc_w);
-  }
-  else
-  {
+  } else {
     __HAL_TIM_SET_COMPARE(&TIM_PWM, TIM_CH_V, ((TIM_PWM.Instance->ARR)) * dtc_u);
     __HAL_TIM_SET_COMPARE(&TIM_PWM, TIM_CH_U, ((TIM_PWM.Instance->ARR)) * dtc_v);
     __HAL_TIM_SET_COMPARE(&TIM_PWM, TIM_CH_W, ((TIM_PWM.Instance->ARR)) * dtc_w);
@@ -51,7 +47,7 @@ void set_dtc(ControllerStruct *controller)
  * @brief Sample the ADC values for the motor controller
  * @param controller Pointer to the ControllerStruct containing ADC values and other parameters
  */
-void analog_sample(ControllerStruct *controller)
+void analog_sample(ControllerStruct * controller)
 {
   /* Sample ADCs */
   /* Handle phase order swapping so that voltage/current/torque match encoder direction */
@@ -59,15 +55,12 @@ void analog_sample(ControllerStruct *controller)
 
   HAL_ADC_Start(&ADC_CH_MAIN);
   HAL_ADC_PollForConversion(&ADC_CH_MAIN, HAL_MAX_DELAY);
-  
-  if (!PHASE_ORDER)
-  {
+
+  if (!PHASE_ORDER) {
     controller->adc_a_raw = HAL_ADC_GetValue(&ADC_CH_IA);
     controller->adc_b_raw = HAL_ADC_GetValue(&ADC_CH_IB);
     // adc_ch_ic = ADC_CH_IC;
-  }
-  else
-  {
+  } else {
     controller->adc_a_raw = HAL_ADC_GetValue(&ADC_CH_IB);
     controller->adc_b_raw = HAL_ADC_GetValue(&ADC_CH_IA);
     // adc_ch_ic = ADC_CH_IB;
@@ -76,7 +69,10 @@ void analog_sample(ControllerStruct *controller)
   controller->adc_vbus_raw = HAL_ADC_GetValue(&ADC_CH_VBUS);
   controller->v_bus = (float)controller->adc_vbus_raw * V_SCALE;
 
-  controller->i_a = controller->i_scale * (float)(controller->adc_a_raw - controller->adc_a_offset); // Calculate phase currents from ADC readings
+  controller->i_a =
+    controller->i_scale *
+    (float)(controller->adc_a_raw -
+            controller->adc_a_offset);  // Calculate phase currents from ADC readings
   controller->i_b = controller->i_scale * (float)(controller->adc_b_raw - controller->adc_b_offset);
   controller->i_c = -controller->i_a - controller->i_b;
 }
@@ -90,7 +86,7 @@ void analog_sample(ControllerStruct *controller)
  * @param b Pointer to store the B-phase voltage
  * @param c Pointer to store the C-phase voltage
  */
-void abc(float theta, float d, float q, float *a, float *b, float *c)
+void abc(float theta, float d, float q, float * a, float * b, float * c)
 {
   /* Inverse DQ0 Transform
   Phase current amplitude = length of dq vector
@@ -113,7 +109,7 @@ void abc(float theta, float d, float q, float *a, float *b, float *c)
  * @param d Pointer to store the D-axis vector
  * @param q Pointer to store the Q-axis vector
  */
-void dq0(float theta, float a, float b, float c, float *d, float *q)
+void dq0(float theta, float a, float b, float c, float * d, float * q)
 {
   /* DQ0 Transform
   Phase current amplitude = length of dq vector
@@ -122,7 +118,8 @@ void dq0(float theta, float a, float b, float c, float *d, float *q)
   float cf = cos_lut(theta);
   float sf = sin_lut(theta);
 
-  *d = 0.6666667f * (cf * a + (SQRT3_2 * sf - .5f * cf) * b + (-SQRT3_2 * sf - .5f * cf) * c); /// Faster DQ0 Transform
+  *d = 0.6666667f * (cf * a + (SQRT3_2 * sf - .5f * cf) * b +
+                     (-SQRT3_2 * sf - .5f * cf) * c);  /// Faster DQ0 Transform
   *q = 0.6666667f * (-sf * a - (-SQRT3_2 * cf - .5f * sf) * b - (SQRT3_2 * cf - .5f * sf) * c);
 }
 
@@ -136,7 +133,7 @@ void dq0(float theta, float a, float b, float c, float *d, float *q)
  * @param dtc_v Pointer to store the V-phase duty cycle
  * @param dtc_w Pointer to store the W-phase duty cycle
  */
-void svm(float v_max, float u, float v, float w, float *dtc_u, float *dtc_v, float *dtc_w)
+void svm(float v_max, float u, float v, float w, float * dtc_u, float * dtc_v, float * dtc_w)
 {
   /* Space Vector Modulation
    u,v,w amplitude = v_bus for full modulation depth */
@@ -144,16 +141,19 @@ void svm(float v_max, float u, float v, float w, float *dtc_u, float *dtc_v, flo
   float v_offset = (fminf3(u, v, w) + fmaxf3(u, v, w)) * 0.5f;
   float v_midpoint = .5f * (DTC_MAX + DTC_MIN);
 
-  *dtc_u = fast_fminf(fast_fmaxf((.5f * (u - v_offset) * OVERMODULATION / v_max + v_midpoint), DTC_MIN), DTC_MAX);
-  *dtc_v = fast_fminf(fast_fmaxf((.5f * (v - v_offset) * OVERMODULATION / v_max + v_midpoint), DTC_MIN), DTC_MAX);
-  *dtc_w = fast_fminf(fast_fmaxf((.5f * (w - v_offset) * OVERMODULATION / v_max + v_midpoint), DTC_MIN), DTC_MAX);
+  *dtc_u = fast_fminf(
+    fast_fmaxf((.5f * (u - v_offset) * OVERMODULATION / v_max + v_midpoint), DTC_MIN), DTC_MAX);
+  *dtc_v = fast_fminf(
+    fast_fmaxf((.5f * (v - v_offset) * OVERMODULATION / v_max + v_midpoint), DTC_MIN), DTC_MAX);
+  *dtc_w = fast_fminf(
+    fast_fmaxf((.5f * (w - v_offset) * OVERMODULATION / v_max + v_midpoint), DTC_MIN), DTC_MAX);
 }
 
 /**
  * @brief Zero the current in the motor controller
  * @param controller Pointer to the ControllerStruct containing current references and ADC offsets
  */
-void zero_current(ControllerStruct *controller)
+void zero_current(ControllerStruct * controller)
 {
   /* Measure zero-current ADC offset */
 
@@ -165,8 +165,7 @@ void zero_current(ControllerStruct *controller)
   controller->dtc_w = 0.f;
   set_dtc(controller);
 
-  for (int i = 0; i < n; i++)
-  { // Average n samples
+  for (int i = 0; i < n; i++) {  // Average n samples
     analog_sample(controller);
     adc_a_offset += controller->adc_a_raw;
     adc_b_offset += controller->adc_b_raw;
@@ -179,7 +178,7 @@ void zero_current(ControllerStruct *controller)
  * @brief Initialize the controller parameters
  * @param controller Pointer to the ControllerStruct to initialize
  */
-void init_controller_params(ControllerStruct *controller)
+void init_controller_params(ControllerStruct * controller)
 {
   controller->ki_d = KI_D;
   controller->ki_q = KI_Q;
@@ -189,15 +188,12 @@ void init_controller_params(ControllerStruct *controller)
   controller->ki_fw = .1f * controller->ki_d;
   controller->phase_order = PHASE_ORDER;
   controller->flux_linkage = KT / (1.5f * PPAIRS);
-  if (I_MAX <= 40.0f)
-  {
+  if (I_MAX <= 40.0f) {
     controller->i_scale = I_SCALE;
-  }
-  else
-  {
+  } else {
     controller->i_scale = 2.0f * I_SCALE;
   }
-  for (int i = 0; i < 128; i++) // Approximate duty cycle linearization
+  for (int i = 0; i < 128; i++)  // Approximate duty cycle linearization
   {
     controller->inverter_tab[i] = 1.0f + 1.2f * exp(-0.0078125f * i / .032f);
   }
@@ -207,9 +203,8 @@ void init_controller_params(ControllerStruct *controller)
  * @brief Reset the FOC controller to a known state
  * @param controller Pointer to the ControllerStruct to reset
  */
-void reset_foc(ControllerStruct *controller)
+void reset_foc(ControllerStruct * controller)
 {
-
   TIM_PWM.Instance->CCR3 = ((TIM_PWM.Instance->ARR)) * (0.5f);
   TIM_PWM.Instance->CCR1 = ((TIM_PWM.Instance->ARR)) * (0.5f);
   TIM_PWM.Instance->CCR2 = ((TIM_PWM.Instance->ARR)) * (0.5f);
@@ -226,7 +221,7 @@ void reset_foc(ControllerStruct *controller)
   controller->otw_flag = 0;
 }
 
-void reset_observer(ObserverStruct *observer)
+void reset_observer(ObserverStruct * observer)
 {
   /*
       observer->temperature = 25.0f;
@@ -235,7 +230,7 @@ void reset_observer(ObserverStruct *observer)
   */
 }
 
-void update_observer(ControllerStruct *controller, ObserverStruct *observer)
+void update_observer(ControllerStruct * controller, ObserverStruct * observer)
 {
   /*
     /// Update observer estimates ///
@@ -247,19 +242,22 @@ void update_observer(ControllerStruct *controller, ObserverStruct *observer)
     observer->q_out = observer->delta_t*R_TH;
     observer->temperature += (INV_M_TH*DT)*(observer->q_in-observer->q_out);
 
-    //float r_d = (controller->v_d*(DTC_MAX-DTC_MIN) + SQRT3*controller->dtheta_elec*(L_Q*controller->i_q))/(controller->i_d*SQRT3);
-    float r_q = (controller->v_q*(DTC_MAX-DTC_MIN) - SQRT3*controller->dtheta_elec*(L_D*controller->i_d + WB))/(controller->i_q*SQRT3);
-    observer->resistance = r_q;//(r_d*controller->i_d + r_q*controller->i_q)/(controller->i_d + controller->i_q); // voltages more accurate at higher duty cycles
+    //float r_d = (controller->v_d*(DTC_MAX-DTC_MIN) +
+    SQRT3*controller->dtheta_elec*(L_Q*controller->i_q))/(controller->i_d*SQRT3); float r_q =
+    (controller->v_q*(DTC_MAX-DTC_MIN) - SQRT3*controller->dtheta_elec*(L_D*controller->i_d +
+    WB))/(controller->i_q*SQRT3); observer->resistance = r_q;//(r_d*controller->i_d +
+    r_q*controller->i_q)/(controller->i_d + controller->i_q); // voltages more accurate at higher
+    duty cycles
 
     //observer->resistance = controller->v_q/controller->i_q;
-    if(isnan(observer->resistance) || isinf(observer->resistance)){observer->resistance = R_NOMINAL;}
-    float t_raw = ((T_AMBIENT + ((observer->resistance/R_NOMINAL) - 1.0f)*254.5f));
+    if(isnan(observer->resistance) || isinf(observer->resistance)){observer->resistance =
+    R_NOMINAL;} float t_raw = ((T_AMBIENT + ((observer->resistance/R_NOMINAL) - 1.0f)*254.5f));
     if(t_raw > 200.0f){t_raw = 200.0f;}
     else if(t_raw < 0.0f){t_raw = 0.0f;}
     observer->temp_measured = .999f*observer->temp_measured + .001f*t_raw;
     float e = (float)observer->temperature - observer->temp_measured;
-    observer->trust = (1.0f - .004f*fminf(abs(controller->dtheta_elec), 250.0f)) * (.01f*(fminf(i_sq, 100.0f)));
-    observer->temperature -= observer->trust*.0001f*e;
+    observer->trust = (1.0f - .004f*fminf(abs(controller->dtheta_elec), 250.0f)) *
+    (.01f*(fminf(i_sq, 100.0f))); observer->temperature -= observer->trust*.0001f*e;
     //printf("%.3f\n\r", e);
 
     if(observer->temperature > TEMP_MAX){controller->otw_flag = 1;}
@@ -271,7 +269,7 @@ void update_observer(ControllerStruct *controller, ObserverStruct *observer)
  * @brief Linearize the duty cycle using a lookup table
  * @param controller Pointer to the ControllerStruct containing the inverter table
  */
-float linearize_dtc(ControllerStruct *controller, float dtc)
+float linearize_dtc(ControllerStruct * controller, float dtc)
 {
   float duty = fast_fmaxf(fast_fminf(fabs(dtc), .999f), 0.0f);
   int index = (int)(duty * 127.0f);
@@ -284,15 +282,17 @@ float linearize_dtc(ControllerStruct *controller, float dtc)
  * @brief Perform field weakening in the motor controller
  * @param controller Pointer to the ControllerStruct containing control parameters
  */
-void field_weaken(ControllerStruct *controller)
+void field_weaken(ControllerStruct * controller)
 {
   /// Field Weakening ///
 
   controller->fw_int += controller->ki_fw * (controller->v_max - 1.0f - controller->v_ref);
   controller->fw_int = fast_fmaxf(fast_fminf(controller->fw_int, 0.0f), -I_FW_MAX);
-  controller->i_q_des = controller->i_q_des + (controller->i_q_des > 0) * controller->fw_int + (controller->i_q_des < 0) * controller->fw_int;
+  controller->i_q_des = controller->i_q_des + (controller->i_q_des > 0) * controller->fw_int +
+                        (controller->i_q_des < 0) * controller->fw_int;
   controller->i_d_des = controller->fw_int;
-  float q_max = sqrtf(controller->i_max * controller->i_max - controller->i_d_des * controller->i_d_des);
+  float q_max =
+    sqrtf(controller->i_max * controller->i_max - controller->i_d_des * controller->i_d_des);
   controller->i_q_des = fast_fmaxf(fast_fminf(controller->i_q_des, q_max), -q_max);
 }
 
@@ -301,7 +301,7 @@ void field_weaken(ControllerStruct *controller)
  * @param controller Pointer to the ControllerStruct containing control parameters
  * @param encoder Pointer to the BasicEncoderStruct containing position and velocity data
  */
-void commutate(ControllerStruct *controller, BasicEncoderStruct *encoder)
+void commutate(ControllerStruct * controller, BasicEncoderStruct * encoder)
 {
   /* Do Field Oriented Control */
 
@@ -311,50 +311,65 @@ void commutate(ControllerStruct *controller, BasicEncoderStruct *encoder)
   controller->theta_mech = encoder->angle_multiturn / GR;
 
   /// Commutation  ///
-  dq0(controller->theta_elec + 1.5f * DT * controller->dtheta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q); // dq0 transform on currents - 3.8 us
+  dq0(
+    controller->theta_elec + 1.5f * DT * controller->dtheta_elec, controller->i_a, controller->i_b,
+    controller->i_c, &controller->i_d, &controller->i_q);  // dq0 transform on currents - 3.8 us
 
-  controller->i_q_filt = (1.0f - CURRENT_FILT_ALPHA) * controller->i_q_filt + CURRENT_FILT_ALPHA * controller->i_q; // these aren't used for control but are sometimes nice for debugging
-  controller->i_d_filt = (1.0f - CURRENT_FILT_ALPHA) * controller->i_d_filt + CURRENT_FILT_ALPHA * controller->i_d;
-  controller->v_bus_filt = (1.0f - VBUS_FILT_ALPHA) * controller->v_bus_filt + VBUS_FILT_ALPHA * controller->v_bus; // used for voltage saturation
+  controller->i_q_filt =
+    (1.0f - CURRENT_FILT_ALPHA) * controller->i_q_filt +
+    CURRENT_FILT_ALPHA *
+      controller->i_q;  // these aren't used for control but are sometimes nice for debugging
+  controller->i_d_filt =
+    (1.0f - CURRENT_FILT_ALPHA) * controller->i_d_filt + CURRENT_FILT_ALPHA * controller->i_d;
+  controller->v_bus_filt = (1.0f - VBUS_FILT_ALPHA) * controller->v_bus_filt +
+                           VBUS_FILT_ALPHA * controller->v_bus;  // used for voltage saturation
 
   controller->v_max = OVERMODULATION * controller->v_bus_filt * (DTC_MAX - DTC_MIN) * SQRT1_3;
   controller->v_margin = controller->v_max - controller->v_ref;
-  controller->i_max = I_MAX; // I_MAX*(!controller->otw_flag) + I_MAX_CONT*controller->otw_flag;
+  controller->i_max = I_MAX;  // I_MAX*(!controller->otw_flag) + I_MAX_CONT*controller->otw_flag;
 
-  limit_norm(&controller->i_d_des, &controller->i_q_des, controller->i_max); // 2.3 us
+  limit_norm(&controller->i_d_des, &controller->i_q_des, controller->i_max);  // 2.3 us
 
   /// PI Controller ///
   float i_d_error = controller->i_d_des - controller->i_d;
   float i_q_error = controller->i_q_des - controller->i_q;
 
-  if (controller->i_q > controller->i_mag_max)
-  {
+  if (controller->i_q > controller->i_mag_max) {
     controller->i_mag_max = controller->i_q;
   }
 
   // Calculate decoupling feed-forward voltages //
 
-  float v_d_ff = 0.0f; //-SQRT3*controller->dtheta_elec*L_Q*controller->i_q;
-  float v_q_ff = 0.0f; // SQRT3*controller->dtheta_elec*(0.0f*L_D*controller->i_d + controller->flux_linkage);
+  float v_d_ff = 0.0f;  //-SQRT3*controller->dtheta_elec*L_Q*controller->i_q;
+  float v_q_ff =
+    0.0f;  // SQRT3*controller->dtheta_elec*(0.0f*L_D*controller->i_d + controller->flux_linkage);
 
   controller->v_d = controller->k_d * i_d_error + controller->d_int + v_d_ff;
 
   controller->v_d = fast_fmaxf(fast_fminf(controller->v_d, controller->v_max), -controller->v_max);
 
   controller->d_int += controller->k_d * controller->ki_d * i_d_error;
-  controller->d_int = fast_fmaxf(fast_fminf(controller->d_int, controller->v_max), -controller->v_max);
-  float vq_max = controller->v_max; // sqrtf(controller->v_max*controller->v_max - controller->v_d*controller->v_d);
+  controller->d_int =
+    fast_fmaxf(fast_fminf(controller->d_int, controller->v_max), -controller->v_max);
+  float vq_max =
+    controller
+      ->v_max;  // sqrtf(controller->v_max*controller->v_max - controller->v_d*controller->v_d);
 
   controller->v_q = controller->k_q * i_q_error + controller->q_int + v_q_ff;
   controller->q_int += controller->k_q * controller->ki_q * i_q_error;
-  controller->q_int = fast_fmaxf(fast_fminf(controller->q_int, controller->v_max), -controller->v_max);
+  controller->q_int =
+    fast_fmaxf(fast_fminf(controller->q_int, controller->v_max), -controller->v_max);
   controller->v_ref = sqrtf(controller->v_d * controller->v_d + controller->v_q * controller->v_q);
   controller->v_q = fast_fmaxf(fast_fminf(controller->v_q, vq_max), -vq_max);
 
   limit_norm(&controller->v_d, &controller->v_q, controller->v_max);
 
-  abc(controller->theta_elec + 1.5f * DT * controller->dtheta_elec, controller->v_d, controller->v_q, &controller->v_u, &controller->v_v, &controller->v_w); // inverse dq0 transform on voltages
-  svm(controller->v_max, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u, &controller->dtc_v, &controller->dtc_w);                     // space vector modulation
+  abc(
+    controller->theta_elec + 1.5f * DT * controller->dtheta_elec, controller->v_d, controller->v_q,
+    &controller->v_u, &controller->v_v, &controller->v_w);  // inverse dq0 transform on voltages
+  svm(
+    controller->v_max, controller->v_u, controller->v_v, controller->v_w, &controller->dtc_u,
+    &controller->dtc_v, &controller->dtc_w);  // space vector modulation
 
   set_dtc(controller);
 }
@@ -363,13 +378,15 @@ void commutate(ControllerStruct *controller, BasicEncoderStruct *encoder)
  * @brief Perform torque control based on desired position and velocity
  * @param controller Pointer to the ControllerStruct containing control parameters
  */
-void torque_control(ControllerStruct *controller)
+void torque_control(ControllerStruct * controller)
 {
   controller->t_ff_filt = 0.9f * controller->t_ff_filt + 0.1f * controller->t_ff;
-  float torque_des = controller->kp * (controller->p_des - controller->theta_mech) + controller->t_ff_filt + controller->kd * (controller->v_des - controller->dtheta_mech);
-  controller->i_q_des = fast_fmaxf(fast_fminf(torque_des / (KT * GR), controller->i_max), -controller->i_max);
-  if (controller->v_bus > V_BUS_MAX)
-  {
+  float torque_des = controller->kp * (controller->p_des - controller->theta_mech) +
+                     controller->t_ff_filt +
+                     controller->kd * (controller->v_des - controller->dtheta_mech);
+  controller->i_q_des =
+    fast_fmaxf(fast_fminf(torque_des / (KT * GR), controller->i_max), -controller->i_max);
+  if (controller->v_bus > V_BUS_MAX) {
     controller->i_q_des = 0;
   }
   controller->i_d_des = 0.0f;
@@ -379,7 +396,7 @@ void torque_control(ControllerStruct *controller)
  * @brief Zero the command values in the controller
  * @param controller Pointer to the ControllerStruct to zero commands
  */
-void zero_commands(ControllerStruct *controller)
+void zero_commands(ControllerStruct * controller)
 {
   controller->t_ff = 0;
   controller->kp = 0;
