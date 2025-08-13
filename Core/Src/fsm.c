@@ -85,7 +85,7 @@ void run_fsm(FSMStruct *fsmstate)
 
   case MOTOR_MODE:
     /* If CAN has timed out, reset all commands */
-    //TODO: only test 
+    // TODO: only test
     if ((CAN_TIMEOUT > 0) && (controller.timeout > CAN_TIMEOUT))
     {
       zero_commands(&controller);
@@ -99,6 +99,16 @@ void run_fsm(FSMStruct *fsmstate)
     controller.timeout++;
     break;
 
+  case DEBUG_MODE:
+    /* Otherwise, commutate */
+
+    torque_control(&controller);
+    field_weaken(&controller);
+    commutate(&controller, &basic_encoder);
+    debug_print();
+
+    controller.timeout++;
+    break;
   case SETUP_MODE:
     break;
 
@@ -135,12 +145,26 @@ void fsm_enter_state(FSMStruct *fsmstate)
     HAL_GPIO_WritePin(LED, GPIO_PIN_RESET);
     reset_foc(&controller);
     drv_enable_gd(drv);
-    //TODO: only test 
-      // controller.commands[0] = 0.0;
-      // controller.commands[1] = 0.0;
-      // controller.commands[2] = 10.0;
-      // controller.commands[3] = 0.5;
-      // controller.commands[4] = 0.0;
+    // TODO: only test
+    //  controller.commands[0] = 0.0;
+    //  controller.commands[1] = 0.0;
+    //  controller.commands[2] = 10.0;
+    //  controller.commands[3] = 0.5;
+    //  controller.commands[4] = 0.0;
+    break;
+  case DEBUG_MODE:
+
+    // printf("Entering Motor Mode\r\n");
+    enter_debug_mode();
+    HAL_GPIO_WritePin(LED, GPIO_PIN_RESET);
+    reset_foc(&controller);
+    drv_enable_gd(drv);
+    // TODO: only test
+    //  controller.commands[0] = 0.0;
+    //  controller.commands[1] = 0.0;
+    //  controller.commands[2] = 10.0;
+    //  controller.commands[3] = 0.5;
+    //  controller.commands[4] = 0.0;
     break;
   case CALIBRATION_MODE:
     // printf("Entering Calibration Mode\r\n");
@@ -193,6 +217,17 @@ void fsm_exit_state(FSMStruct *fsmstate)
     //}
     zero_commands(&controller); // Set commands to zero
     break;
+  case DEBUG_MODE:
+    /* Don't stop commutating if there are high currents or FW happening */
+    // if( (fabs(controller.i_q_filt)<1.0f) && (fabs(controller.i_d_filt)<1.0f) ){
+    fsmstate->ready = 1;
+    drv_disable_gd(drv);
+    reset_foc(&controller);
+    // printf("Leaving Motor Mode\r\n");
+    HAL_GPIO_WritePin(LED, GPIO_PIN_SET);
+    //}
+    zero_commands(&controller); // Set commands to zero
+    break;
   case CALIBRATION_MODE:
     // printf("Exiting Calibration Mode\r\n");
     drv_disable_gd(drv);
@@ -227,7 +262,10 @@ void update_fsm(FSMStruct *fsmstate, char fsm_input)
     case MOTOR_CMD:
       fsmstate->next_state = MOTOR_MODE;
       fsmstate->ready = 0;
-      
+      break;
+    case DEBUG_CMD:
+      fsmstate->next_state = DEBUG_MODE;
+      fsmstate->ready = 0;
       break;
     case ENCODER_CMD:
       fsmstate->next_state = ENCODER_MODE;
@@ -284,6 +322,9 @@ void update_fsm(FSMStruct *fsmstate, char fsm_input)
     break;
   case MOTOR_MODE:
     break;
+  case DEBUG_MODE:
+    process_debug_input(fsm_input);
+    break;
   }
   // printf("FSM State: %d  %d\r\n", fsmstate.state, fsmstate.state_change);
 }
@@ -300,6 +341,7 @@ void enter_menu_state(void)
   printf(" s - Setup\n\r");
   printf(" e - Display Encoder\n\r");
   printf(" z - Set Zero Position\n\r");
+  printf(" d - Debug Mode\n\r");
   printf(" esc - Exit to Menu\n\r");
 
   // gpio.led->write(0);
@@ -331,6 +373,61 @@ void enter_setup_state(void)
   printf("VALUES NOT ACTIVE UNTIL POWER CYCLE! \n\r\n\r");
 }
 
+void enter_debug_mode(void)
+{
+  // drv.disable_gd();
+  // reset_foc(&controller);
+  // gpio.enable->write(0);
+  printf("\n\r\n\r");
+  printf(" Commands:\n\r");
+  printf(" 0 - STOP\n\r");
+  printf(" 1 - 1A\n\r");
+  printf(" 2 - 1.5A\n\r");
+  // printf(" 3 - Setup\n\r");
+  // printf(" 4 - Display Encoder\n\r");
+  // printf(" 5 - Set Zero Position\n\r");
+  // printf(" 6 - Debug Mode\n\r");
+  printf(" esc - Exit to Menu\n\r");
+
+  // gpio.led->write(0);
+}
+
+void process_debug_input(char debug_input)
+{
+  switch (debug_input)
+  {
+  case '0':
+    controller.p_des = 0.0;
+    controller.v_des = 0.0;
+    controller.kp = 0.0;
+    controller.kd = 0.0;
+    controller.t_ff = 0.0;
+    break;
+  case '1':
+    controller.p_des = 0.0;
+    controller.v_des = 0.0;
+    controller.kp = 0.0;
+    controller.kd = 0.0;
+    controller.t_ff = 0.5 * (KT * GR);
+    break;
+  case '2':
+    controller.p_des = 0.0;
+    controller.v_des = 0.0;
+    controller.kp = 0.0;
+    controller.kd = 0.0;
+    controller.t_ff = 1.0 * (KT * GR);
+    break;
+  default:
+    break;
+  }
+}
+void debug_print()
+{
+  printf("current a: %.3f b:%.3f c:%.3f \r\n", controller.i_a, controller.i_b, controller.i_c);
+  printf("voltage a: %.3f b:%.3f c:%.3f \r\n", controller.v_u, controller.v_v, controller.v_w);
+  printf("current q: %.3f d:%.3f q_des %.3f\r\n", controller.i_q, controller.i_d,controller.i_q_des);
+  printf("encoder ang: %.3f vel:%.3f \r\n", controller.theta_elec, controller.dtheta_elec);
+}
 void process_user_input(FSMStruct *fsmstate)
 {
   /* Collects user input from serial (maybe eventually CAN) and updates settings */

@@ -22,6 +22,7 @@ extern "C" {
 #define SETUP_MODE          4
 #define ENCODER_MODE        5
 #define INIT_TEMP_MODE      6
+#define DEBUG_MODE      	7
 
 #define MENU_CMD			27
 #define MOTOR_CMD			'm'
@@ -29,6 +30,7 @@ extern "C" {
 #define ENCODER_CMD			'e'
 #define SETUP_CMD			's'
 #define ZERO_CMD			'z'
+#define DEBUG_CMD			'd'
 #define ENTER_CMD			13
 
 
@@ -50,6 +52,9 @@ void fsm_exit_state(FSMStruct * fsmstate);
 void enter_menu_state(void);
 void enter_setup_state(void);
 void enter_motor_mode(void);
+void debug_print();
+void enter_debug_mode(void);
+void process_debug_input(char debug_input);
 void process_user_input(FSMStruct * fsmstate);
 
 #ifdef __cplusplus

@@ -52,8 +52,8 @@
 /* Current controller */
 #define L_D .00004f				// D axis inductance
 #define L_Q .00004f				// Q axis inductance
-#define K_D .1f                    // Loop gain,  Volts/Amp
-#define K_Q .1f                    // Loop gain,  Volts/Amp
+#define K_D .06f                    // Loop gain,  Volts/Amp
+#define K_Q .06f                    // Loop gain,  Volts/Amp
 #define K_SCALE 0.00012f             // K_loop/Loop BW (Hz) 0.0042
 #define KI_D 0.045f                // PI zero, in radians per sample
 #define KI_Q 0.045f                // PI zero, in radians per sample

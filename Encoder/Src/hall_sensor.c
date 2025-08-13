@@ -62,9 +62,9 @@ uint8_t hall_sensor_get_state_from_gpio()
 
 void hall_sensor_init(HallSensorStruct *h, uint8_t new_hall_state, float pole_pairs)
 {
-  if (new_hall_state == 0 || new_hall_state > 6 )
+  if (new_hall_state == 0 || new_hall_state > 6)
   {
-    new_hall_state=0;
+    new_hall_state = 0;
   }
   h->hall_state = new_hall_state;
   h->prev_hall_state = new_hall_state; // Initialize previous state to current state
@@ -76,6 +76,7 @@ void hall_sensor_init(HallSensorStruct *h, uint8_t new_hall_state, float pole_pa
   h->pole_pairs = pole_pairs;
   h->is_ovf = 1;
   h->is_stop = 1;
+  h->list_idx = 0;
 }
 
 void hall_sensor_update(HallSensorStruct *h, uint8_t new_hall_state, uint16_t current_time_ticks)
@@ -144,6 +145,9 @@ void hall_sensor_update(HallSensorStruct *h, uint8_t new_hall_state, uint16_t cu
   {
     h->electrical_velocity_rad_s = 0.0f;
   }
+  int pre_idx, now_idx = h->list_idx;
+  pre_idx = (now_idx + N_POS_SAMPLES - 1) % N_POS_SAMPLES;
+  h->electrical_velocity_rad_s = (h->multiturn_list[now_idx] - h->multiturn_list[pre_idx])/(N_POS_SAMPLES*DT);
 
   // Update state.
   h->prev_hall_state = h->hall_state;
@@ -158,10 +162,15 @@ void hall_sensor_get_estimate_angle(HallSensorStruct *h, uint16_t current_time_t
 
   // Calculate interpolated offset from the last Hall angle.
   float angle_offset = h->electrical_velocity_rad_s * ((float)time_since_last_event_ticks * TIMER_TICK_S);
-  if (current_time_ticks * TIMER_TICK_S > 1.0 || angle_offset > PI_OVER_3_F || angle_offset < -PI_OVER_3_F)
+  if (current_time_ticks * TIMER_TICK_S > 1.0)
   {
     h->electrical_velocity_rad_s = 0.0;
     h->is_ovf = 1;
+    h->is_stop = 1;
+  }
+  else if (angle_offset > PI_OVER_3_F || angle_offset < -PI_OVER_3_F)
+  {
+    h->electrical_velocity_rad_s = 0.0;
     h->is_stop = 1;
   }
 
@@ -209,6 +218,8 @@ void hall_sensor_get_estimate_angle(HallSensorStruct *h, uint16_t current_time_t
   res->angle_singleturn = (machine_single_turn - machine_single_turn_int) * TWO_PI_F;
   res->angle_multiturn = (single_turn_angle + TWO_PI_F * h->multiturn_cnt) / h->pole_pairs;
   res->velocity = h->electrical_velocity_rad_s / h->pole_pairs;
+  h->list_idx = (h->list_idx + 1) % N_POS_SAMPLES;
+  h->multiturn_list[h->list_idx] = res->angle_multiturn * h->pole_pairs;
 }
 
 void hall_sensor_overflow(HallSensorStruct *h, BasicEncoderStruct *res)

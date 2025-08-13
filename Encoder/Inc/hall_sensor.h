@@ -17,6 +17,7 @@
 // Example: If the timer clock is 1MHz (1,000,000 Hz), 1 tick is 1us.
 // 1us = 0.000001s
 #define TIMER_TICK_S 0.0001f
+#define N_POS_SAMPLES 20		// Number of position samples to store.  should put this somewhere else...
 
 // HallSensorStruct struct definition
 typedef struct {
@@ -30,6 +31,8 @@ typedef struct {
     volatile uint8_t  is_stop;                  // is stopping not calculate angular velocity term
     volatile uint8_t  is_ovf;                   // is stop and overflow tim buf
     volatile int32_t  multiturn_cnt;            // multi turn count
+    volatile float multiturn_list[N_POS_SAMPLES];
+    volatile uint16_t list_idx;
 
     // --- Configuration Values ---
     float pole_pairs; // Number of motor pole pairs

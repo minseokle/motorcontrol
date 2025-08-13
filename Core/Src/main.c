@@ -284,7 +284,8 @@ int main(void)
   else if (ENCODER_TYPE == ENCODER_HALL)
   {
     hall_sensor_init(&hall_sensor, hall_sensor_get_state_from_gpio(), 14);
-    HAL_TIM_IC_Start_IT(&htim8, TIM_CHANNEL_1); // Start the Hall sensor timer
+    // HAL_TIM_IC_Start_IT(&htim8, TIM_CHANNEL_1); // Start the Hall sensor timer
+    HAL_TIMEx_HallSensor_Start_IT(&htim8);
   }
   // for(int i = 0; i<128; i++){printf("%d\r\n", comm_encoder.offset_lut[i]);}
 
@@ -423,7 +424,6 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 {
   if (htim->Instance == TIM8) // If the interrupt is from TIM8

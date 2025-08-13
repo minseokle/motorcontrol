@@ -17,7 +17,7 @@ void order_phases(BasicEncoderStruct *encoder, ControllerStruct *controller, Cal
 {
   /* Checks phase order, to ensure that positive Q current produces
      torque in the positive direction wrt the position sensor */
-  PHASE_ORDER = 0;
+  // PHASE_ORDER = 0;
 
   if (!cal->started)
   {
@@ -86,6 +86,7 @@ void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_
     cal->start_count = loop_count;
     cal->next_sample_time = T1;
     cal->sample_count = 0;
+    E_ZERO = 0;
   }
 
   cal->time = (float)(loop_count - cal->start_count) * DT;
@@ -113,10 +114,12 @@ void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_
     // sample SAMPLES_PER_PPAIR times per pole-pair
     if (cal->time > cal->next_sample_time)
     {
+      printf("%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction, hall_sensor->electrical_velocity_rad_s);
+
       int count_ref = cal->theta_ref * (float)ENC_CPR / (2.0f * PI_F * hall_sensor->pole_pairs);
       int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F - count_ref; //- encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
       cal->error_arr[cal->sample_count] = error + ENC_CPR * (error < 0);
-      printf("%d %d %d %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref);
+      printf("%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref, encoder->elec_angle);
       cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
       if (cal->sample_count == hall_sensor->pole_pairs * SAMPLES_PER_PPAIR - 1)
       {
@@ -138,12 +141,14 @@ void calibrate_hall_encoder(BasicEncoderStruct *encoder, HallSensorStruct *hall_
     // sample SAMPLES_PER_PPAIR times per pole-pair
     if ((cal->time > cal->next_sample_time) && (cal->sample_count > 0))
     {
+      printf("%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction, hall_sensor->electrical_velocity_rad_s);
+
       int count_ref = cal->theta_ref * (float)ENC_CPR / (2.0f * PI_F * hall_sensor->pole_pairs);
       int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F - count_ref; // - encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
       error = error + ENC_CPR * (error < 0);
 
       cal->error_arr[cal->sample_count] = (cal->error_arr[cal->sample_count] + error) / 2;
-      printf("%d %d %d %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref);
+      printf("%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count], cal->theta_ref, encoder->elec_angle);
       cal->sample_count--;
       cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
     }

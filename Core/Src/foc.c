@@ -56,6 +56,10 @@ void analog_sample(ControllerStruct *controller)
   /* Sample ADCs */
   /* Handle phase order swapping so that voltage/current/torque match encoder direction */
   /* Read in zero vector position */
+
+  HAL_ADC_Start(&ADC_CH_MAIN);
+  HAL_ADC_PollForConversion(&ADC_CH_MAIN, HAL_MAX_DELAY);
+  
   if (!PHASE_ORDER)
   {
     controller->adc_a_raw = HAL_ADC_GetValue(&ADC_CH_IA);
@@ -68,9 +72,6 @@ void analog_sample(ControllerStruct *controller)
     controller->adc_b_raw = HAL_ADC_GetValue(&ADC_CH_IA);
     // adc_ch_ic = ADC_CH_IB;
   }
-
-  HAL_ADC_Start(&ADC_CH_MAIN);
-  HAL_ADC_PollForConversion(&ADC_CH_MAIN, HAL_MAX_DELAY);
 
   controller->adc_vbus_raw = HAL_ADC_GetValue(&ADC_CH_VBUS);
   controller->v_bus = (float)controller->adc_vbus_raw * V_SCALE;
@@ -310,7 +311,7 @@ void commutate(ControllerStruct *controller, BasicEncoderStruct *encoder)
   controller->theta_mech = encoder->angle_multiturn / GR;
 
   /// Commutation  ///
-  dq0(controller->theta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q); // dq0 transform on currents - 3.8 us
+  dq0(controller->theta_elec + 1.5f * DT * controller->dtheta_elec, controller->i_a, controller->i_b, controller->i_c, &controller->i_d, &controller->i_q); // dq0 transform on currents - 3.8 us
 
   controller->i_q_filt = (1.0f - CURRENT_FILT_ALPHA) * controller->i_q_filt + CURRENT_FILT_ALPHA * controller->i_q; // these aren't used for control but are sometimes nice for debugging
   controller->i_d_filt = (1.0f - CURRENT_FILT_ALPHA) * controller->i_d_filt + CURRENT_FILT_ALPHA * controller->i_d;
