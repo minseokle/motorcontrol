@@ -84,6 +84,11 @@ void calibrate_hall_encoder(
     cal->next_sample_time = T1;
     cal->sample_count = 0;
     E_ZERO = 0;
+
+    for (int i = 0; i < 8; i++) {
+      cal->hall_theta[i] = .0f;
+      cal->hall_theta_num[i] = 0;
+    }
   }
 
   cal->time = (float)(loop_count - cal->start_count) * DT;
@@ -99,9 +104,13 @@ void calibrate_hall_encoder(
     cal->theta_start = encoder->angle_multiturn;
     cal->next_sample_time = cal->time;
     return;
-  } else if (cal->time < T1 + 2.0f * PI_F * hall_sensor->pole_pairs / W_CAL) {
+  } else if (cal->time < T1 + 4.0f * PI_F * hall_sensor->pole_pairs / W_CAL) {
     // rotate voltage vector through one mechanical rotation in the positive direction
-    cal->theta_ref += W_CAL * DT;  //(cal->time-T1);
+    if (cal->time < T1 + 2.0f * PI_F * hall_sensor->pole_pairs / W_CAL) {
+      cal->theta_ref += W_CAL * DT;
+    } else {
+      cal->theta_ref -= W_CAL * DT;
+    }
     cal->cal_position.elec_angle = cal->theta_ref;
     commutate(controller, &cal->cal_position);
 
@@ -111,45 +120,21 @@ void calibrate_hall_encoder(
         "%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction,
         hall_sensor->electrical_velocity_rad_s);
 
+      float elec_ref_theta = fmodf(cal->theta_ref, TWO_PI_F);
+
       int count_ref = cal->theta_ref * (float)ENC_CPR / (2.0f * PI_F * hall_sensor->pole_pairs);
       int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F -
                   count_ref;  //- encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
       cal->error_arr[cal->sample_count] = error + ENC_CPR * (error < 0);
+
+      cal->hall_theta[hall_sensor->hall_state] += elec_ref_theta;
+      cal->hall_theta[hall_sensor->hall_state]++;
+
       printf(
         "%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count],
         cal->theta_ref, encoder->elec_angle);
       cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
-      if (cal->sample_count == hall_sensor->pole_pairs * SAMPLES_PER_PPAIR - 1) {
-        return;
-      }
       cal->sample_count++;
-    }
-    return;
-  } else if (cal->time < T1 + 4.0f * PI_F * hall_sensor->pole_pairs / W_CAL) {
-    // rotate voltage vector through one mechanical rotation in the negative direction
-    cal->theta_ref -= W_CAL * DT;  //(cal->time-T1);
-    controller->i_d_des = I_CAL;
-    controller->i_q_des = 0.0f;
-    cal->cal_position.elec_angle = cal->theta_ref;
-    commutate(controller, &cal->cal_position);
-
-    // sample SAMPLES_PER_PPAIR times per pole-pair
-    if ((cal->time > cal->next_sample_time) && (cal->sample_count > 0)) {
-      printf(
-        "%d %d %d %.3f \r\n", hall_sensor->is_ovf, hall_sensor->is_stop, hall_sensor->direction,
-        hall_sensor->electrical_velocity_rad_s);
-
-      int count_ref = cal->theta_ref * (float)ENC_CPR / (2.0f * PI_F * hall_sensor->pole_pairs);
-      int error = encoder->angle_singleturn * ENC_CPR / TWO_PI_F -
-                  count_ref;  // - encoder->angle_singleturn*ENC_CPR/TWO_PI_F;
-      error = error + ENC_CPR * (error < 0);
-
-      cal->error_arr[cal->sample_count] = (cal->error_arr[cal->sample_count] + error) / 2;
-      printf(
-        "%d %d %d %.3f %.3f\r\n", cal->sample_count, count_ref, cal->error_arr[cal->sample_count],
-        cal->theta_ref, encoder->elec_angle);
-      cal->sample_count--;
-      cal->next_sample_time += 2.0f * PI_F / (W_CAL * SAMPLES_PER_PPAIR);
     }
     return;
   }
@@ -162,6 +147,17 @@ void calibrate_hall_encoder(
     ezero_mean += cal->error_arr[i];
   }
   cal->ezero = ezero_mean / (SAMPLES_PER_PPAIR * hall_sensor->pole_pairs);
+
+  for (int i = 0; i < 8; i++) {
+    // cal->hall_theta[i] /= cal->hall_theta_num[i];
+  }
+
+  printf(
+    "hall state average %f %f %f %f %f %f \r\n", cal->hall_theta[1], cal->hall_theta[2],
+    cal->hall_theta[3], cal->hall_theta[4], cal->hall_theta[5], cal->hall_theta[6]);
+  printf(
+    "hall state average %d %d %d %d %d %d \r\n", cal->hall_theta_num[1], cal->hall_theta_num[2],
+    cal->hall_theta_num[3], cal->hall_theta_num[4], cal->hall_theta_num[5], cal->hall_theta[6]);
 
   cal->started = 0;
   cal->done_cal = 1;

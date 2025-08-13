@@ -41,6 +41,9 @@ typedef struct
   int lut_arr[N_LUT];
   BasicEncoderStruct cal_position;  // Position reference used for calibration
 
+  float hall_theta[8];
+  int hall_theta_num[8];
+
 } CalStruct;
 
 void order_phases(
